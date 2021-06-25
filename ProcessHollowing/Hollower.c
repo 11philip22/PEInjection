@@ -93,6 +93,9 @@ _PPEB ReadRemotePEB(HANDLE hProcess) {
 	PPROCESS_BASIC_INFORMATION	pBasicInfo = FindRemotePEB(hProcess);
 	DWORD						dwPEBAddress = pBasicInfo->PebBaseAddress;
 
+	if (!pBasicInfo)
+		return NULL;
+
 	_PPEB pPEB = malloc(sizeof(_PEB));  // todo: Replace with virtualalloc
 	if (!pPEB)
 		return NULL;
@@ -103,8 +106,8 @@ _PPEB ReadRemotePEB(HANDLE hProcess) {
 		sizeof(_PEB),
 		0);
 	if (!bSuccess) {
-		free(pPEB);
-		pPEB = NULL;    // todo: replace with virtualfree
+		free(pPEB);  // todo: replace with virtualfree
+		pPEB = NULL;    
 	}
 
 	if (pBasicInfo)
