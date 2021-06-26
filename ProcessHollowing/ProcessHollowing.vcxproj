@@ -145,6 +145,14 @@
     <ClInclude Include="Hollower.h" />
     <ClInclude Include="Ntapi.h" />
     <ClInclude Include="PEB.h" />
+    <ClInclude Include="resource.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="ProcessHollowing.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\Release\HelloWorld.exe" />
+    <None Include="..\x64\Release\HelloWorld.exe" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

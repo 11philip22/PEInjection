@@ -29,5 +29,17 @@
     <ClInclude Include="Hollower.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="resource.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="ProcessHollowing.rc">
+      <Filter>Resource Files</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\Release\HelloWorld.exe" />
+    <None Include="..\x64\Release\HelloWorld.exe" />
   </ItemGroup>
 </Project>
