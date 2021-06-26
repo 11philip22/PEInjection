@@ -47,7 +47,7 @@ INT main() {
 		"\"notepad.exe\"",
 		NULL,
 		NULL,
-		NULL,
+		0,
 		CREATE_SUSPENDED,
 		NULL,
 		NULL,
@@ -100,21 +100,22 @@ lblCleanup:
 //
 // Helper functions
 //
-PPROCESS_BASIC_INFORMATION FindRemotePEB(HANDLE hProcess) {
-	HMODULE hNTDLL = LoadLibraryA("ntdll");
-
-	if (!hNTDLL)
-		return NULL;
-
-	FARPROC fpNtQueryInformationProcess = GetProcAddress(hNTDLL,"NtQueryInformationProcess");
-
-	if (!fpNtQueryInformationProcess)
-		return NULL;
-
-	NTQUERYINFORMATIONPROCESS pNtQueryInformationProcess = (NTQUERYINFORMATIONPROCESS)fpNtQueryInformationProcess;
-	PPROCESS_BASIC_INFORMATION pBasicInfo = malloc(sizeof(PROCESS_BASIC_INFORMATION));  // todo: Replace with virtualalloc
+PPROCESS_BASIC_INFORMATION FindRemotePeb(CONST HANDLE hProcess) {																								// NOLINT(misc-misplaced-const)
+	PPROCESS_BASIC_INFORMATION pBasicInfo;
 	DWORD dwReturnLength = 0;
 
+	NTQUERYINFORMATIONPROCESS pNtQueryInformationProcess;
+	
+	CONST HMODULE hNtdll = LoadLibraryW(L"ntdll");
+	if (hNtdll) {
+		pNtQueryInformationProcess = (NTQUERYINFORMATIONPROCESS)GetProcAddress(hNtdll, "NtQueryInformationProcess");
+		FreeLibrary(hNtdll);
+	}
+	else {
+		return NULL;
+	}
+
+	pBasicInfo = malloc(sizeof(PROCESS_BASIC_INFORMATION));  // todo: Replace with virtualalloc
 	pNtQueryInformationProcess(hProcess,
 		0,
 		pBasicInfo,
@@ -129,7 +130,7 @@ PPROCESS_BASIC_INFORMATION FindRemotePEB(HANDLE hProcess) {
 }
 
 _PPEB ReadRemotePEB(HANDLE hProcess) {
-	PPROCESS_BASIC_INFORMATION	pBasicInfo = FindRemotePEB(hProcess);
+	PPROCESS_BASIC_INFORMATION	pBasicInfo = FindRemotePeb(hProcess);
 	if (!pBasicInfo)
 		return NULL;
 
