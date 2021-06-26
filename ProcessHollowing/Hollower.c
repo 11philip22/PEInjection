@@ -89,10 +89,10 @@ lblCleanup:
 		CloseHandle(processInformation.hThread);
 
 	if (pPEB)
-		free(pPEB);  // todo: replace with virtualfree
+		VirtualFree(pPEB, 0, MEM_RELEASE);
 
 	if (pImage)
-		free(pImage);   // todo: replace with virtualfree
+		VirtualFree(pImage, 0, MEM_RELEASE);
 
 	return iRet;
 }
@@ -100,7 +100,8 @@ lblCleanup:
 //
 // Helper functions
 //
-PPROCESS_BASIC_INFORMATION FindRemotePeb(CONST HANDLE hProcess) {																								// NOLINT(misc-misplaced-const)
+PPROCESS_BASIC_INFORMATION FindRemotePeb(CONST HANDLE hProcess) {																									// NOLINT(misc-misplaced-const)
+	NTSTATUS ntStatus;
 	PPROCESS_BASIC_INFORMATION pBasicInfo;
 	DWORD dwReturnLength = 0;
 
@@ -115,17 +116,18 @@ PPROCESS_BASIC_INFORMATION FindRemotePeb(CONST HANDLE hProcess) {															
 		return NULL;
 	}
 
-	pBasicInfo = malloc(sizeof(PROCESS_BASIC_INFORMATION));  // todo: Replace with virtualalloc
-	pNtQueryInformationProcess(hProcess,
+	pBasicInfo = VirtualAlloc(NULL, sizeof(PROCESS_BASIC_INFORMATION), MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+	ntStatus= pNtQueryInformationProcess(hProcess,
 		0,
 		pBasicInfo,
 		sizeof(PROCESS_BASIC_INFORMATION),
 		&dwReturnLength);
+
+	if (NT_SUCCESS(ntStatus)) 
+		return pBasicInfo;
 	
 	if (pBasicInfo)
-		return pBasicInfo;
-
-	free(pBasicInfo);  // todo: replace with virtualfree
+		VirtualFree(pBasicInfo, 0, MEM_RELEASE);
 	return NULL;
 }
 
@@ -136,7 +138,7 @@ _PPEB ReadRemotePEB(HANDLE hProcess) {
 
 	DWORD dwPEBAddress = pBasicInfo->PebBaseAddress;
 
-	_PPEB pPEB = malloc(sizeof(_PEB));  // todo: Replace with virtualalloc
+	_PPEB pPEB = VirtualAlloc(NULL, sizeof(_PEB), MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 	if (!pPEB)
 		return NULL;
 
@@ -146,12 +148,12 @@ _PPEB ReadRemotePEB(HANDLE hProcess) {
 		sizeof(_PEB),
 		0);
 	if (!bSuccess) {
-		free(pPEB);  // todo: replace with virtualfree
+		VirtualFree(pPEB, 0, MEM_RELEASE);
 		pPEB = NULL;    
 	}
 
 	if (pBasicInfo)
-		free(pBasicInfo);  // todo: replace with virtualfree
+		VirtualFree(pBasicInfo, 0, MEM_RELEASE);
 
 	return pPEB;
 }
@@ -159,7 +161,7 @@ _PPEB ReadRemotePEB(HANDLE hProcess) {
 PLOADED_IMAGE ReadRemoteImage(HANDLE hProcess, LPCVOID lpImageBaseAddress) {
 	PLOADED_IMAGE pImage = NULL;
 	
-	BYTE* lpBuffer = malloc(BUFFER_SIZE);  // todo: Replace with virtualalloc
+	BYTE* lpBuffer = VirtualAlloc(0, BUFFER_SIZE, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 	if (!lpBuffer)
 		return NULL;
 
@@ -172,7 +174,7 @@ PLOADED_IMAGE ReadRemoteImage(HANDLE hProcess, LPCVOID lpImageBaseAddress) {
 		goto lblCleanup;
 
 	PIMAGE_DOS_HEADER pDOSHeader = (PIMAGE_DOS_HEADER)lpBuffer;
-	pImage = malloc(sizeof(LOADED_IMAGE));  // todo: Replace with virtualalloc
+	pImage = VirtualAlloc(0, sizeof(LOADED_IMAGE), MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 	if (!pImage)
 		goto lblCleanup;
 
@@ -182,7 +184,7 @@ PLOADED_IMAGE ReadRemoteImage(HANDLE hProcess, LPCVOID lpImageBaseAddress) {
 
 lblCleanup:
 	if (lpBuffer)
-		free(lpBuffer);  // todo: replace with virtualfree
+		VirtualFree(lpBuffer, 0, MEM_RELEASE);
 
 	return pImage;
 }
