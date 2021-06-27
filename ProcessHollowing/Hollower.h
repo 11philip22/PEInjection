@@ -33,3 +33,29 @@ typedef struct _LOADED_IMAGE {
 //
 _PPEB ReadRemotePEB(HANDLE);
 PLOADED_IMAGE ReadRemoteImage(HANDLE, LPCVOID);
+
+inline PIMAGE_NT_HEADERS32 GetNTHeaders(DWORD dwImageBase)
+{
+	return (PIMAGE_NT_HEADERS32)(dwImageBase +
+		((PIMAGE_DOS_HEADER)dwImageBase)->e_lfanew);
+}
+
+inline PLOADED_IMAGE GetLoadedImage(DWORD dwImageBase)
+{
+	PIMAGE_DOS_HEADER pDosHeader = (PIMAGE_DOS_HEADER)dwImageBase;
+	PIMAGE_NT_HEADERS32 pNTHeaders = GetNTHeaders(dwImageBase);
+
+	PLOADED_IMAGE pImage = VirtualAlloc(NULL, sizeof(LOADED_IMAGE), MEM_COMMIT, PAGE_READWRITE);
+
+	pImage->FileHeader =
+		(PIMAGE_NT_HEADERS32)(dwImageBase + pDosHeader->e_lfanew);
+
+	pImage->NumberOfSections =
+		pImage->FileHeader->FileHeader.NumberOfSections;
+
+	pImage->Sections =
+		(PIMAGE_SECTION_HEADER)(dwImageBase + pDosHeader->e_lfanew +
+			sizeof(IMAGE_NT_HEADERS32));
+
+	return pImage;
+}

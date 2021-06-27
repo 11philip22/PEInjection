@@ -13,6 +13,8 @@ INT main() {
 	STARTUPINFOA			startupInfo;
 	PROCESS_INFORMATION		processInformation;
 	PLOADED_IMAGE			pImage = NULL;
+	PLOADED_IMAGE			pSourceImage = NULL;
+	PIMAGE_NT_HEADERS32		pSourceHeaders;
 	_PPEB					pPEB = NULL;
 	NTSTATUS				ntStatus;
 	HANDLE					hHostProcess;
@@ -20,6 +22,7 @@ INT main() {
 	INT						iRet = ERROR_SUCCESS;
 	DWORD					dwExeSize;
 	HGLOBAL					hgExe;
+	PVOID					pBuffer = NULL;
 
 	// Function pointers
 	NTUNMAPVIEWOFSECTION	pNtUnmapViewOfSection;
@@ -80,13 +83,21 @@ INT main() {
 	//
 	// Load Hello World EXE from resource
 	//
-#ifdef _WIN64
-	hrsrcHelloWorld = FindResourceW(NULL, MAKEINTRESOURCEW(IDR_HELLOWORLD_EXE2), L"HELLOWORLD_EXE");
-#else
 	hrsrcHelloWorld = FindResourceW(NULL, MAKEINTRESOURCEW(IDR_HELLOWORLD_EXE1), L"HELLOWORLD_EXE");
-#endif
+	if (!hrsrcHelloWorld) {
+		printf("[-] Unable to load exe from resource\r\n");
+		iRet = ERROR_RESOURCE_NOT_FOUND;
+		goto lblCleanup;
+	}
+
 	dwExeSize = SizeofResource(NULL, hrsrcHelloWorld);
 	hgExe = LoadResource(NULL, hrsrcHelloWorld);
+
+	pBuffer = VirtualAlloc(0, dwExeSize, MEM_COMMIT, PAGE_READWRITE);
+	memcpy(pBuffer, hgExe, dwExeSize);
+	
+	pSourceImage = GetLoadedImage((DWORD)pBuffer);
+	pSourceHeaders = GetNTHeaders((DWORD)pBuffer);
 	
 	
 	printf("[*] Allocating memory\r\n");
@@ -108,6 +119,12 @@ lblCleanup:
 
 	if (pImage)
 		VirtualFree(pImage, 0, MEM_RELEASE);
+
+	if (pBuffer)
+		VirtualFree(pBuffer, 0, MEM_RELEASE);
+
+	if (pSourceImage)
+		VirtualFree(pSourceImage, 0, MEM_RELEASE);
 
 	return iRet;
 }
@@ -131,8 +148,7 @@ PPROCESS_BASIC_INFORMATION FindRemotePeb(CONST HANDLE hProcess) {															
 		return NULL;
 	}
 
-	pBasicInfo = VirtualAlloc(
-		NULL, sizeof(PROCESS_BASIC_INFORMATION), MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+	pBasicInfo = VirtualAlloc(NULL, sizeof(PROCESS_BASIC_INFORMATION), MEM_COMMIT, PAGE_READWRITE);
 	ntStatus= pNtQueryInformationProcess(hProcess,
 		0,
 		pBasicInfo,
@@ -154,8 +170,7 @@ _PPEB ReadRemotePEB(HANDLE hProcess) {
 
 	DWORD dwPEBAddress = pBasicInfo->PebBaseAddress;
 
-	_PPEB pPEB = VirtualAlloc(
-		NULL, sizeof(_PEB), MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+	_PPEB pPEB = VirtualAlloc(NULL, sizeof(_PEB), MEM_COMMIT, PAGE_READWRITE);
 	if (!pPEB)
 		return NULL;
 
@@ -178,8 +193,7 @@ _PPEB ReadRemotePEB(HANDLE hProcess) {
 PLOADED_IMAGE ReadRemoteImage(HANDLE hProcess, LPCVOID lpImageBaseAddress) {
 	PLOADED_IMAGE pImage = NULL;
 	
-	BYTE* lpBuffer = VirtualAlloc(
-		0, BUFFER_SIZE, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+	BYTE* lpBuffer = VirtualAlloc(0, BUFFER_SIZE, MEM_COMMIT, PAGE_READWRITE);
 	if (!lpBuffer)
 		return NULL;
 
@@ -192,8 +206,7 @@ PLOADED_IMAGE ReadRemoteImage(HANDLE hProcess, LPCVOID lpImageBaseAddress) {
 		goto lblCleanup;
 
 	PIMAGE_DOS_HEADER pDOSHeader = (PIMAGE_DOS_HEADER)lpBuffer;
-	pImage = VirtualAlloc(
-		0, sizeof(LOADED_IMAGE), MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+	pImage = VirtualAlloc(0, sizeof(LOADED_IMAGE), MEM_COMMIT, PAGE_READWRITE);
 	if (!pImage)
 		goto lblCleanup;
 
