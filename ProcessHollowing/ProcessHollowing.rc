@@ -50,9 +50,13 @@ END
 // HELLOWORLD_EXE
 //
 
-IDR_HELLOWORLD_EXE1     HELLOWORLD_EXE          "C:\\Users\\Philip\\source\\repos\\11philip22\\PEInjection\\Release\\HelloWorld.exe"
+//IDR_HELLOWORLD_EXE1     HELLOWORLD_EXE          "C:\\Users\\Philip\\source\\repos\\11philip22\\PEInjection\\Release\\HelloWorld.exe"
+//
+//IDR_HELLOWORLD_EXE2     HELLOWORLD_EXE          "C:\\Users\\Philip\\source\\repos\\11philip22\\PEInjection\\x64\\Release\\HelloWorld.exe"
 
-IDR_HELLOWORLD_EXE2     HELLOWORLD_EXE          "C:\\Users\\Philip\\source\\repos\\11philip22\\PEInjection\\x64\\Release\\HelloWorld.exe"
+IDR_HELLOWORLD_EXE1     HELLOWORLD_EXE          "C:\\Users\\Administrator\\source\\repos\\11philip22\\PEInjection\\Release\\HelloWorld.exe"
+
+IDR_HELLOWORLD_EXE2     HELLOWORLD_EXE          "C:\\Users\\Administrator\\source\\repos\\11philip22\\PEInjection\\x64\\Release\\HelloWorld.exe"
 
 #endif    // Dutch (Netherlands) resources
 /////////////////////////////////////////////////////////////////////////////
